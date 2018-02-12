@@ -1,7 +1,9 @@
+**Important**: PayPal Mobile SDKs are now Deprecated and only existing integrations are supported. For all new integrations, use [Braintree Direct](https://www.braintreepayments.com/products/braintree-direct) in [supported countries](https://www.braintreepayments.com/country-selection). In other countries, use [Express Checkout](https://developer.paypal.com/docs/accept-payments/express-checkout/ec-braintree-sdk/get-started/) and choose the Braintree SDK integration option.
+
 PayPal Android SDK
 ==================
 
-The PayPal Android SDK makes it easy to add PayPal and credit card payments to mobile apps.
+The PayPal Android SDK makes it easy to add PayPal payments to mobile apps.
 
 *This documentation is available in Japanese: [日本語のドキュメント](docs/ja/README.md).*
 
@@ -13,13 +15,22 @@ The PayPal Android SDK makes it easy to add PayPal and credit card payments to m
 - [Add the SDK to Your Project](#add-the-sdk-to-your-project)
 - [Credentials](#credentials)
 - [International Support](#international-support)
-- [Disabling card.io card scanning](#disabling-cardio-card-scanning)
+- [Disabling Direct Credit Card Payments](#disabling-direct-credit-card-payments)
+- [Override `minSdkVersion`](#override-minsdkversion)
 - [Testing](#testing)
 - [Documentation](#documentation)
 - [Usability](#usability)
-- [Dependency Conflicts](#dependency-conflicts)
-- [Moving to PayPal Android SDK 2.0](#moving-to-paypal-android-sdk-20)
 - [Next Steps](#next-steps)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Add the SDK to Your Project
+
+The PayPal Android SDK is now available at [Maven Repository](https://repo1.maven.org/maven2/com/paypal/sdk/paypal-android-sdk/). The latest version is available via `mavenCentral()`:
+
+```groovy
+compile 'com.paypal.sdk:paypal-android-sdk:2.16.0'
+```
 
 
 ## Use Cases
@@ -29,10 +40,12 @@ The SDK supports two use cases for making payments - **Single Payment** and **Fu
 
 ### Single Payment
 
-Receive immediate payment from a customer's PayPal account or payment card (scanned with [card.io](https://www.card.io/)):
+Receive a one-time payment from a customer's PayPal account or payment card (scanned with [card.io](https://www.card.io/)). This can be either (1) an **immediate** payment which your servers should subsequently **verify**, or (2) an **authorization** for a payment which your servers must subsequently **capture**, or (3) a payment for an **order** which your servers must subsequently **authorize** and **capture**:
 
 1. [Accept a Single Payment](docs/single_payment.md) and receive back a proof of payment.
-2. On your server, [Verify the Payment](https://developer.paypal.com/webapps/developer/docs/integration/mobile/verify-mobile-payment/) (PayPal Developer site) using PayPal's API.
+2. On your server, [Verify the Payment](https://developer.paypal.com/webapps/developer/docs/integration/mobile/verify-mobile-payment/), [Capture the Payment](https://developer.paypal.com/webapps/developer/docs/integration/direct/capture-payment/#capture-the-payment), or [Process the Order](https://developer.paypal.com/webapps/developer/docs/integration/direct/create-process-order/) (PayPal Developer site) using PayPal's API.
+
+*Note:* Direct Credit Card (DCC) payments are now deprecated in this SDK.  Please use [Braintree Payments](https://www.braintreepayments.com/), a PayPal Company, which is the easiest way to accept PayPal, credit cards, and many other payment methods.  All new integrations should [disable direct credit card payments](#disabling-direct-credit-card-payments).
 
 
 ### Future Payments
@@ -62,21 +75,12 @@ The SDK will now use the newest version of the PayPal Wallet App if present on t
 
 ### Limitations
 
-* The integration will _not_ be enabled in any of the [testing](#testing) modes, as the Wallet app does not support this developer testing environonment.
+* The integration will _not_ be enabled in any of the [testing](#testing) modes, as the Wallet app does not support this developer testing environment.
 
 ## Requirements
 
-* Android 2.2 or later
-* card.io card scanning available only on armv7 devices
+* Android 4.1.x (API 16) or later
 * Phone or tablet
-
-
-## Add the SDK to Your Project
-
-1. Download or clone this repo. The SDK includes a .jar, static libraries, release notes, and license acknowledgements. It also includes a sample app.
-2. Copy the contents of the SDK `libs` directory into your project's `libs` directory. The path to these files is important; if it is not exactly correct, the SDK will not work.  (_NOTE:_ If you are using Gradle, copy SDK jar file into your project's `libs` directory, `add as library` to project, and finally copy the SDK folders containing the *.so files into `src/main/jniLibs`.)
-3. Add the open source license acknowledgments from `acknowledgments.md` to your app's acknowledgments.
-
 
 ## Credentials
 
@@ -94,6 +98,14 @@ While testing your app, when logging in to PayPal in the SDK's UI you should use
 
 You can create both business and personal Sandbox accounts on the [Sandbox accounts](https://developer.paypal.com/webapps/developer/applications/accounts) page.
 
+#### Sandbox and TLSv1.2
+
+PayPal will be upgrading the endpoint that the PayPal Android SDK uses to communicate with PayPal servers on Jan 18th, 2016.  If you're testing on sandbox with a version of the PayPal Android SDK older than 2.13.0, then you'll start seeing communication failures when using Android devices >= API 16, and < API 20.  Please upgrade to a version [2.13.0](https://github.com/paypal/PayPal-Android-SDK/releases) or higher to fix these errors.
+
+If you're testing on a device older than API 16, Android will not be able to communicate with PayPal, no matter what version of the SDK you use.
+
+These TLS changes coincides with the TLSv1.2 security mandate outlined [here](https://www.paypal-knowledge.com/infocenter/index?page=content&widgetview=true&id=FAQ1914&viewlocale=en_US), and will be followed by a similar change to the Production endpoints at some later date.  For any questions or concerns, please [create an issue](https://github.com/paypal/PayPal-Android-SDK/issues/).
+
 ### Live
 
 To obtain your **live** credentials, you will need to have a business account. If you don't yet have a business account, there is a link at the bottom of that same Applications page that will get you started.
@@ -109,19 +121,26 @@ The SDK has built-in translations for many languages and locales. See [javadoc](
 
 The SDK supports multiple currencies. See [the REST API country and currency documentation](https://developer.paypal.com/webapps/developer/docs/integration/direct/rest_api_payment_country_currency_support/) for a complete, up-to-date list.
 
-Note that currency support differs for credit card versus PayPal payments. Unless you disable credit card acceptance (via the `PaymentActivity.EXTRA_SKIP_CREDIT_CARD` intent extra), **we recommend limiting transactions to currencies supported by both payment types.** Currently these are: USD, GBP, CAD, EUR, JPY.
+## Disabling Direct Credit Card Payments
 
-If your app initiates a transaction with a currency that turns out to be unsupported for the user's selected payment type, then the SDK will display an error to the user and write a message to the console log.
-
-
-## Disabling card.io card scanning
-
-Future payments does not require card.io card scanning, so it is safe to remove the camera scanner libraries by removing the following folders within the `lib` directory: `armeabi`, `armeabi-v7a`, `mips`, and `x86`.
-
-Single Payments can be configured to accept credit cards through manual entry, but without card scanning.  To do so, remove the same libs above, and remove `android.permission.CAMERA` and `android.permission.VIBRATE` permissions from `AndroidManifest.xml`.  If you wish to disable credit card support altogether, follow the above steps to reduce the permissions and sdk footprint, and add the following to the `PayPalConfiguration` initialization:
+Disabling Direct Credit Card Payments is now preferred. To completely disable Direct Credit Card (DCC) payments, exclude the card.io library in your application `build.gradle`:
+```groovy
+dependencies {
+    compile('com.paypal.sdk:paypal-android-sdk:2.16.0') {
+        exclude group: 'io.card'
+    }
+}
 ```
-config.acceptCreditCards(false);
+
+## Override `minSdkVersion`
+
+As of release `2.14.0`, the `minSdkVersion` has been increased to 16. If you prefer to have your app on a lower `minSdkVersion` and want to leverage the latest SDK, please disable PayPal for versions below API 16, add `xmlns:tools="http://schemas.android.com/tools` inside the manifest's xml declaration, and add the following snippet to your `AndroidManifest.xml`: 
+   
+```xml
+<uses-sdk android:minSdkVersion="INSERT_YOUR_DESIRED_minSdkVersion_HERE" tools:overrideLibrary="com.paypal.android.sdk.payments"/>
 ```
+
+See the [Android manifest merger docs](http://tools.android.com/tech-docs/new-build-system/user-guide/manifest-merger) for more information.
 
 ## Testing
 
@@ -141,48 +160,18 @@ During development, use `environment()` in the `PayPalConfiguration` object to c
 User interface appearance and behavior is set within the library itself. For the sake of usability and user experience consistency, apps should not attempt to modify the SDK's behavior beyond the documented methods.
 
 
-## Dependency Conflicts
-
-The Android SDK is built on top of the [Apache HttpComponents](http://hc.apache.org/) library included within Android.  This can lead to a conflict if you provide your own copy of either Apache's [httpclient](http://hc.apache.org/httpcomponents-client-4.3.x/index.html), [httpcore](http://hc.apache.org/httpcomponents-core-4.3.x/index.html), or a package that depends on either of these, such as [httpmime](http://hc.apache.org/httpcomponents-client-4.3.x/httpmime/project-reports.html).  To resolve this, you must use [httpclient-android](http://hc.apache.org/httpcomponents-client-4.3.x/android-port.html) instead of httpcore and httpclient.  The following example is the Android equivalent of the httpmime, httpcore, and httpclient dependencies:
-
-```
-compile ('org.apache.httpcomponents:httpclient-android:4.3.5')
-compile ('org.apache.httpcomponents:httpmime:4.3.6') {
-    exclude(group: 'org.apache.httpcomponents', module: 'httpclient')
-}
-```
-
-
-## Moving to PayPal Android SDK 2.0
-
-
-### Upgrade from 1.x
-
-As a major version change, the API introduced in 2.0 is not backward compatible with 1.x integrations. However, the SDK still supports all previous single payment functionality. Upgrading is straightforward.
-
-* Most of the non-payment-specific extras of `PayPalPaymentActivity` have been moved to the `PayPalConfiguration` class, and the service startup has changed to take such a configuration object.
-
-
-
-### Older Libraries
-
-PayPal is in the process of replacing the older "Mobile Payments Libraries" (MPL) with the new PayPal Android and iOS SDKs.
-The new Mobile SDKs are based on the PayPal REST API, while the older MPL uses the Adaptive Payments API.
-
-Until features such as third-party, parallel, and chained payments are available, if needed, you can use MPL:
-
- - [MPL on GitHub](https://github.com/paypal/sdk-packages/tree/gh-pages/MPL)
- - [MPL Documentation](https://developer.paypal.com/webapps/developer/docs/classic/mobile/gs_MPL/)
-
-Issues related to MPL should be filed in the [sdk-packages repo](https://github.com/paypal/sdk-packages/).
-
-Developers with existing Express Checkout integrations or who want additional features may wish to use [Mobile Express Checkout](https://developer.paypal.com/webapps/developer/docs/classic/mobile/gs_MEC/)
-in a webview.
-
-
 ## Next Steps
 
 Depending on your use case, you can now:
 
 * [Accept a single payment](docs/single_payment.md)
 * [Obtain user consent](docs/future_payments_mobile.md) to [create future payments](docs/future_payments_server.md).
+
+
+## Contributing
+
+Please read our [contributing guidelines](CONTRIBUTING.md) prior to submitting a Pull Request.
+
+## License
+
+Please refer to this repo's [license file](LICENSE).
